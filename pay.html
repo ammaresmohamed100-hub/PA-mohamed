@@ -1,0 +1,80 @@
+<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex">
+<title>الدفع</title>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box}body{margin:0;font-family:Cairo,sans-serif;background:#0f2e26;color:#10241e;min-height:100vh;display:grid;place-items:center;padding:16px}
+.c{background:#fbfaf6;border-radius:18px;padding:22px;width:100%;max-width:440px}
+h1{margin:0 0 4px;font-size:22px;font-weight:900}p{margin:0 0 14px;color:#5b6b64;font-size:14px}
+label{display:block;font-weight:700;font-size:14px;margin:12px 0 4px}
+input,textarea{font:inherit;width:100%;padding:11px;border:1px solid #cfd8d3;border-radius:10px;background:#fff}
+.m{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px}
+.m label{margin:0;border:1px solid #cfd8d3;border-radius:10px;padding:10px;text-align:center;cursor:pointer;background:#fff}
+.m input{display:none}.m input:checked+span{color:#047857}.m label:has(input:checked){border-color:#047857;background:#e7f6ef}
+button,.b{display:block;width:100%;margin-top:16px;padding:13px;border:0;border-radius:12px;background:#047857;color:#fff;font:inherit;font-weight:900;font-size:16px;cursor:pointer;text-align:center;text-decoration:none}
+.i{background:#eef3f0;border-radius:10px;padding:12px;margin-top:12px;font-size:14px;line-height:1.8}.i b{font-size:18px;direction:ltr;unicode-bidi:embed}
+.h{display:none}#e{color:#b91c1c;font-size:14px;margin-top:8px}
+</style></head><body><div class="c">
+<div id="ld" class="i">جاري التحميل...</div>
+<div id="bad" class="h"><h1>اللينك مش شغال</h1><p>المنتج ده مش متاح أو اللينك غلط. اطلب من البائع لينك جديد.</p></div>
+<div id="f" class="h"><h1>ادفع بسهولة</h1><p>اكتب اسمك وموبايلك واختار طريقة الدفع.</p>
+<div id="pi" class="i" style="margin:0 0 6px">🛒 <span id="pn"></span><br>السعر: <b id="pp"></b> جنيه</div>
+<label>الاسم</label><input id="n" maxlength="60" autocomplete="name">
+<label>رقم موبايلك</label><input id="p" inputmode="numeric" maxlength="11" placeholder="01xxxxxxxxx" autocomplete="tel">
+<label>طريقة الدفع</label>
+<div class="m"><label><input type="radio" name="t" value="instapay" checked><span>إنستاباي</span></label>
+<label><input type="radio" name="t" value="vodafone"><span>فودافون كاش</span></label>
+<label><input type="radio" name="t" value="cod"><span>عند الاستلام</span></label>
+<label id="cl" class="h"><input type="radio" name="t" value="card"><span>بطاقة بنكية</span></label></div>
+<div class="i" id="inf"></div>
+<div id="adw" class="h"><label>عنوان التوصيل بالتفصيل</label><textarea id="ad" rows="2" maxlength="250" placeholder="المحافظة - المنطقة - الشارع - رقم العمارة والشقة"></textarea></div>
+<label>ملاحظة (اختياري)</label><textarea id="o" rows="2" maxlength="200"></textarea>
+<div id="e"></div><button id="s">تسجيل طلب الدفع</button></div>
+<div id="d" class="h"><h1>تم تسجيل طلبك</h1>
+<p>رقم الطلب: <b id="r" style="direction:ltr;unicode-bidi:embed"></b></p>
+<div class="i" id="nx"></div><a id="ib" class="b h" target="_blank" rel="noopener">افتح إنستاباي وحوّل</a><a id="cb" class="b h" target="_blank" rel="noopener">اكمل الدفع بالبطاقة</a></div>
+</div>
+<script type="module">
+import {db,PAYMOB_LINK,RECEIVING,INSTAPAY_LINK,INSTAPAY_ID} from './firebase-config.js';
+import {doc,getDoc,setDoc,serverTimestamp} from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+const $=i=>document.getElementById(i);
+const pid=new URLSearchParams(location.search).get('p')||'';
+let prod=null;
+const bad=()=>{$('ld').classList.add('h');$('f').classList.add('h');$('bad').classList.remove('h')};
+(async()=>{try{
+  if(!/^[a-z0-9]{6,20}$/.test(pid))return bad();
+  const s=await getDoc(doc(db,'products',pid));
+  if(!s.exists()||s.data().active!==true)return bad();
+  prod=s.data();$('pn').textContent=prod.name;$('pp').textContent=prod.price/100;
+  $('ld').classList.add('h');$('f').classList.remove('h');
+}catch{bad()}})();
+if(PAYMOB_LINK)$('cl').classList.remove('h');
+const msg={instapay:`حوّل على إنستاباي لعنوان الدفع:<br><b>${INSTAPAY_ID}</b><br><a href="${INSTAPAY_LINK}" target="_blank" rel="noopener" style="display:block;margin-top:10px;padding:11px;border-radius:10px;background:#047857;color:#fff;text-align:center;text-decoration:none;font-weight:700">افتح إنستاباي وحوّل</a><br>وابعت صورة التحويل بعد الدفع.`,
+vodafone:`حوّل فودافون كاش للرقم:<br><b>${RECEIVING}</b><br>وابعت صورة التحويل بعد الدفع.`,
+cod:'ادفع كاش للمندوب أول ما تستلم طلبك. اكتب عنوانك بالتفصيل، وهنكلمك على موبايلك نأكد الطلب والتوصيل.',
+card:'هتتحول لصفحة Paymob الآمنة تدخل فيها بيانات البطاقة. بياناتها مش بتعدي علينا.'};
+const sel=()=>document.querySelector('input[name=t]:checked').value;
+const show=()=>{$('inf').innerHTML=msg[sel()];$('adw').classList.toggle('h',sel()!=='cod')};
+document.querySelectorAll('input[name=t]').forEach(x=>x.onchange=show);show();
+$('s').onclick=async()=>{
+  if(!prod)return;
+  const name=$('n').value.trim(),phone=$('p').value.trim(),t=sel(),addr=$('ad').value.trim();
+  const err=m=>$('e').textContent=m;
+  if(!name)return err('اكتب اسمك.');
+  if(!/^01[0-9]{9}$/.test(phone))return err('رقم الموبايل لازم يكون ١١ رقم ويبدأ بـ 01.');
+  if(t==='cod'&&addr.length<8)return err('اكتب عنوان التوصيل بالتفصيل.');
+  if(Date.now()-(+localStorage.getItem('lt')||0)<15000)return err('استنى ثواني وجرب تاني.');
+  $('s').disabled=true;err('');
+  const b=crypto.getRandomValues(new Uint32Array(2)),id=('P'+b[0].toString(36)+b[1].toString(36)).toUpperCase().slice(0,10);
+  try{
+    const data={amount:prod.price,method:t,name,phone,note:$('o').value.trim(),status:'pending',createdAt:serverTimestamp(),productId:pid,item:prod.name};
+    if(t==='cod')data.address=addr;
+    await setDoc(doc(db,'payments',id),data);
+    localStorage.setItem('lt',Date.now());
+    $('f').classList.add('h');$('d').classList.remove('h');$('r').textContent=id;
+    $('nx').innerHTML=t==='cod'?'هنكلمك على موبايلك نأكد الطلب والتوصيل. جهّز المبلغ كاش للمندوب وقت الاستلام.':t==='card'?'كمّل الدفع من الزرار تحت. هنأكد طلبك أول ما الدفع يوصل.':'بعد ما تحوّل ابعت صورة التحويل ورقم الطلب. هنأكد لك أول ما التحويل يوصل.';
+    if(t==='instapay'){$('ib').href=INSTAPAY_LINK;$('ib').classList.remove('h');}
+    if(t==='card'&&PAYMOB_LINK){$('cb').href=PAYMOB_LINK;$('cb').classList.remove('h');}
+  }catch(x){err('حصلت مشكلة. حدّث الصفحة وجرب تاني.');$('s').disabled=false;}
+};
+</script></body></html>

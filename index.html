@@ -1,0 +1,94 @@
+<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex">
+<title>تسجيل الدخول</title>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+:root{--g:#047857;--m:#5b6b64;--l:#dfe6e2}*{box-sizing:border-box}
+body{margin:0;font-family:Cairo,sans-serif;background:#eef2ef;color:#10241e}
+.w{max-width:980px;margin:auto;padding:14px}.c{background:#fff;border:1px solid var(--l);border-radius:14px;padding:16px;margin-bottom:12px}
+.g{display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(190px,1fr))}.n{font-size:28px;font-weight:900}.m{color:var(--m);font-size:13px}
+input,select,button{font:inherit;padding:10px;border:1px solid var(--l);border-radius:10px}
+button,.a{background:var(--g);color:#fff;border:0;cursor:pointer;font-weight:700;text-decoration:none;padding:7px 11px;border-radius:9px;font-size:13px;display:inline-block}
+.r{background:#b91c1c}.s{background:#475569}.o{overflow-x:auto}table{width:100%;border-collapse:collapse;font-size:14px;min-width:640px}
+th,td{padding:8px;border-bottom:1px solid var(--l);text-align:right}.h{display:none}.f{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.t{padding:2px 9px;border-radius:99px;font-size:12px;font-weight:700}.pending{background:#fef3c7;color:#92400e}.confirmed{background:#d1fae5;color:#065f46}.rejected{background:#fee2e2;color:#991b1b}
+#L{max-width:360px;margin:12vh auto}#L input{width:100%;margin-bottom:8px}
+</style></head><body><div class="w">
+<div id="L" class="c" style="text-align:center"><h2>لوحة التحويلات</h2><p class="m">ادخل بحساب Google المسموح له بس.</p><button id="gg" style="width:100%;padding:12px;font-size:16px">الدخول بحساب Google</button><div id="le" class="m" style="color:#b91c1c;margin-top:10px"></div></div>
+<div id="A" class="h">
+<div class="f" style="justify-content:space-between;margin-bottom:10px"><h2 style="margin:0">لوحة التحويلات</h2><button class="s" id="out">خروج</button></div>
+<div class="g" id="st"></div>
+<div class="c" style="margin-top:12px"><b>المنتجات</b>
+<div class="f" style="margin:8px 0"><input id="pn" placeholder="اسم المنتج"><input id="pp" inputmode="decimal" placeholder="السعر بالجنيه"><button id="pb">إضافة منتج</button></div>
+<div class="o"><table style="min-width:520px"><tbody id="pt"></tbody></table></div><div id="pe" class="m">مفيش منتجات لسه. ضيف أول منتج وانسخ لينكه.</div></div>
+<div class="c" style="margin-top:12px"><b>تسجيل تحويل وصل (مؤكد)</b><div class="f" style="margin-top:8px">
+<input id="ma" inputmode="decimal" placeholder="المبلغ بالجنيه"><select id="mm"><option value="instapay">إنستاباي</option><option value="vodafone">فودافون كاش</option><option value="card">بطاقة</option><option value="cash">نقدي</option><option value="cod">عند الاستلام</option></select>
+<input id="mn" placeholder="اسم العميل / البيان"><button id="mb">حفظ</button><button class="s" id="ex">تصدير Excel</button></div></div>
+<div class="c o"><table><thead><tr><th>الرقم</th><th>الوقت</th><th>العميل</th><th>المبلغ</th><th>الطريقة</th><th>الحالة</th><th></th></tr></thead><tbody id="tb"></tbody></table>
+<div id="em0" class="m" style="padding:14px">مفيش عمليات لسه.</div></div>
+</div></div>
+<script type="module">
+import {db,auth} from './firebase-config.js';
+import {onAuthStateChanged,signOut,setPersistence,browserLocalPersistence,GoogleAuthProvider,signInWithPopup,signInWithRedirect} from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+import {collection,query,orderBy,onSnapshot,doc,updateDoc,setDoc,deleteDoc,serverTimestamp} from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+const $=i=>document.getElementById(i),PH=['01091310361','01123050047','01062206779'];
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const egp=p=>(p/100).toLocaleString('ar-EG',{minimumFractionDigits:0,maximumFractionDigits:2})+' ج.م';
+const M={instapay:'إنستاباي',vodafone:'فودافون كاش',card:'بطاقة',cash:'نقدي',cod:'عند الاستلام'},S={pending:'بانتظار التأكيد',confirmed:'مؤكدة',rejected:'مرفوضة'};
+const split=t=>{const b=Math.floor(t/3),r=t%3;return[b+(r>0),b+(r>1),b]};
+let rows=[],prods=[],first=true,unsub,unsubP;
+const social=async p=>{try{await setPersistence(auth,browserLocalPersistence);await signInWithPopup(auth,p);$('le').textContent=''}
+  catch(e){if(['auth/popup-blocked','auth/operation-not-supported-in-this-environment'].includes(e.code))return signInWithRedirect(auth,p);
+  if(!['auth/popup-closed-by-user','auth/cancelled-popup-request'].includes(e.code))$('le').textContent='فشل الدخول: '+e.code}};
+$('gg').onclick=()=>social(new GoogleAuthProvider());
+$('out').onclick=()=>signOut(auth);
+onAuthStateChanged(auth,u=>{
+  $('L').classList.toggle('h',!!u);$('A').classList.toggle('h',!u);
+  if(unsub){unsub();unsub=null}
+  if(unsubP){unsubP();unsubP=null}
+  if(!u)return;first=true;
+  unsub=onSnapshot(query(collection(db,'payments'),orderBy('createdAt','desc')),s=>{
+    if(!first&&s.docChanges().some(c=>c.type==='added'&&c.doc.data().status==='pending'))beep();
+    first=false;rows=s.docs.map(d=>({id:d.id,...d.data()}));draw();
+  },()=>{$('le').textContent='مش مسموح لك بالدخول.';signOut(auth)});
+  unsubP=onSnapshot(query(collection(db,'products'),orderBy('createdAt','desc')),s=>{prods=s.docs.map(d=>({id:d.id,...d.data()}));drawP()});
+});
+const link=id=>new URL('pay.html?p='+id,location.href).href;
+function drawP(){$('pe').classList.toggle('h',prods.length>0);
+  $('pt').innerHTML=prods.map(p=>`<tr><td>${esc(p.name)}</td><td><b>${egp(p.price)}</b></td><td><span class="t ${p.active?'confirmed':'rejected'}">${p.active?'شغال':'موقوف'}</span></td><td><div class="f"><button data-c="${esc(p.id)}">نسخ اللينك</button><button class="s" data-e="${esc(p.id)}">السعر</button><button class="s" data-t="${esc(p.id)}">${p.active?'إيقاف':'تفعيل'}</button><button class="r" data-d="${esc(p.id)}">حذف</button></div></td></tr>`).join('')}
+$('pt').onclick=async e=>{const b=e.target.closest('button');if(!b)return;
+  const id=b.dataset.c||b.dataset.e||b.dataset.t||b.dataset.d,p=prods.find(x=>x.id===id);if(!p)return;
+  if(b.dataset.c){try{await navigator.clipboard.writeText(link(id));b.textContent='اتنسخ ✓'}catch{prompt('انسخ اللينك:',link(id))}}
+  else if(b.dataset.e){const v=parseFloat((prompt('السعر الجديد بالجنيه',p.price/100)||'').replace(',','.'));if(v>0)updateDoc(doc(db,'products',id),{price:Math.round(v*100)})}
+  else if(b.dataset.t)updateDoc(doc(db,'products',id),{active:!p.active});
+  else if(b.dataset.d&&confirm('حذف المنتج ده؟ اللينك بتاعه هيقف.'))deleteDoc(doc(db,'products',id))};
+$('pb').onclick=async()=>{const n=$('pn').value.trim(),v=parseFloat($('pp').value.replace(',','.'));if(!n||!(v>0))return alert('اكتب اسم المنتج وسعر صحيح');
+  const id=(Math.random().toString(36)+'000000').slice(2,8)+Date.now().toString(36).slice(-4);
+  await setDoc(doc(db,'products',id),{name:n.slice(0,100),price:Math.round(v*100),active:true,createdAt:serverTimestamp()});$('pn').value='';$('pp').value=''};
+const when=r=>r.createdAt?.toDate?r.createdAt.toDate():new Date();
+function draw(){
+  const ok=rows.filter(r=>r.status==='confirmed'),tot=ok.reduce((a,r)=>a+r.amount,0),
+  td=ok.filter(r=>when(r).toDateString()===new Date().toDateString()).reduce((a,r)=>a+r.amount,0),
+  pn=rows.filter(r=>r.status==='pending').length,sh=split(tot);
+  $('st').innerHTML=`<div class="c"><div class="m">إجمالي المؤكد</div><div class="n">${egp(tot)}</div><div class="m">${ok.length} عملية</div></div>
+  <div class="c"><div class="m">تحويلات النهارده</div><div class="n">${egp(td)}</div></div>
+  <div class="c"><div class="m">بانتظار التأكيد</div><div class="n">${pn}</div></div>
+  <div class="c"><div class="m">نصيب كل شريك</div><div class="n">${egp(sh[0])}</div><div class="m">الباقي من القروش بيتوزع بدقة</div></div>`;
+  $('em0').classList.toggle('h',rows.length>0);
+  $('tb').innerHTML=rows.map(r=>{
+    const s=split(r.amount),wa=[1,2].map(i=>`<a class="a s" target="_blank" rel="noopener" href="https://wa.me/2${PH[i]}?text=${encodeURIComponent(`تحويل مؤكد ${egp(r.amount)} (${r.id}) من ${r.name||''}. نصيبك: ${egp(s[i])}`)}">واتساب ${i+1}</a>`).join(' ');
+    const act=r.status==='pending'?`<button data-a="confirmed" data-i="${esc(r.id)}">تأكيد الاستلام</button> <button class="r" data-a="rejected" data-i="${esc(r.id)}">رفض</button>`:r.status==='confirmed'?wa:'';
+    return`<tr><td>${esc(r.id)}</td><td>${when(r).toLocaleString('ar-EG')}</td><td>${esc(r.name)}<div class="m">${esc(r.phone)}</div>${r.item?`<div class="m">🛒 ${esc(r.item)}</div>`:''}${r.address?`<div class="m">📍 ${esc(r.address)}</div>`:''}</td><td><b>${egp(r.amount)}</b></td><td>${M[r.method]||esc(r.method)}</td><td><span class="t ${esc(r.status)}">${S[r.status]||''}</span></td><td>${act}</td></tr>`}).join('');
+}
+$('tb').onclick=e=>{const b=e.target.closest('button[data-a]');if(!b)return;
+  if(b.dataset.a==='rejected'&&!confirm('رفض الطلب ده؟'))return;
+  updateDoc(doc(db,'payments',b.dataset.i),{status:b.dataset.a,reviewedBy:auth.currentUser.email,reviewedAt:serverTimestamp()});};
+$('mb').onclick=async()=>{const v=parseFloat($('ma').value.replace(',','.'));if(!(v>0))return alert('اكتب مبلغ صحيح');
+  const id=('M'+Date.now().toString(36)+Math.random().toString(36).slice(2,5)).toUpperCase();
+  await setDoc(doc(db,'payments',id),{amount:Math.round(v*100),method:$('mm').value,name:$('mn').value.trim(),phone:'',note:'تسجيل يدوي',status:'confirmed',createdAt:serverTimestamp(),reviewedBy:auth.currentUser.email});
+  $('ma').value='';$('mn').value='';};
+$('ex').onclick=()=>{const q=v=>`"${String(v??'').replace(/"/g,'""')}"`;
+  const csv='\ufeff'+['الرقم,الوقت,العميل,الموبايل,العنوان,المنتج,المبلغ,الطريقة,الحالة',...rows.map(r=>[r.id,when(r).toLocaleString('ar-EG'),r.name,r.phone,r.address||'',r.item||'',r.amount/100,M[r.method]||r.method,S[r.status]].map(q).join(','))].join('\n');
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));a.download='payments.csv';a.click();};
+function beep(){try{const c=new AudioContext(),o=c.createOscillator();o.connect(c.destination);o.frequency.value=880;o.start();o.stop(c.currentTime+.25)}catch{}}
+</script></body></html>
